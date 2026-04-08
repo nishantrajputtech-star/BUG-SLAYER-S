@@ -1,0 +1,28 @@
+{
+  "name": "clinicsync",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "dexie": "^4.0.0",
+    "dexie-react-hooks": "^1.1.7",
+    "html5-qrcode": "^2.3.8",
+    "jspdf": "^2.5.1",
+    "lucide-react": "^0.395.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.24.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.3.1",
+    "vite-plugin-pwa": "^0.20.0"
+  }
+}

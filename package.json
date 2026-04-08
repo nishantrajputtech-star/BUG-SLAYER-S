@@ -1,0 +1,10 @@
+{
+  "name": "clinicsync-master",
+  "version": "1.0.0",
+  "description": "Master controller for ClinicSync MERN app",
+  "scripts": {
+    "dev": "npm run dev --prefix app",
+    "server": "node server/index.js",
+    "install-all": "npm install --prefix app && npm install --prefix server"
+  }
+}
