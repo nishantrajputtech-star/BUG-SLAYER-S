@@ -11,7 +11,7 @@ import ExecutiveAlerts from './components/ExecutiveAlerts';
 import Auth from './components/Auth';
 import Profile from './components/Profile';
 
-function Sidebar({ onLogout, username, role }) {
+function Sidebar({ onLogout, username, role, profilePic }) {
   const location = useLocation();
   const isActive = (path) => location.pathname === path;
 
@@ -27,8 +27,8 @@ function Sidebar({ onLogout, username, role }) {
       <Link to="/profile" className="sidebar-profile-link" style={{ textDecoration: 'none', color: 'inherit' }}>
         <div style={{ padding: '24px 16px 0', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ padding: '8px', borderRadius: '50%', position: 'relative', width: '40px', height: '40px', background: 'var(--border)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-             {userInfo.profilePic ? (
-               <img src={userInfo.profilePic} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+             {profilePic ? (
+               <img src={profilePic} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
              ) : (
                <User size={18} color="var(--text-muted)" />
              )}
@@ -129,7 +129,7 @@ function Layout({ onLogout, userInfo }) {
 
   return (
     <div className="app-layout">
-      <Sidebar onLogout={onLogout} username={userInfo.username} role={userInfo.role} />
+      <Sidebar onLogout={onLogout} username={userInfo.username} role={userInfo.role} profilePic={userInfo.profilePic} />
       <main className="main-content">
         <header className="mobile-header" style={{ justifyContent: 'space-between' }}>
           <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>

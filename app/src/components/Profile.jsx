@@ -1,5 +1,5 @@
 import { User, Mail, Shield, Save, CheckCircle, AlertCircle, Loader2, ArrowLeft, Camera } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Profile({ onUpdate }) {
