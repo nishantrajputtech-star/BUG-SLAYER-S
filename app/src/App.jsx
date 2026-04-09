@@ -67,12 +67,13 @@ function Sidebar({ onLogout, username, role }) {
         </Link>
       </nav>
 
-      <div style={{ padding: '20px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
         <button 
           onClick={(e) => { e.preventDefault(); onLogout(); }} 
-          className="logout-btn"
+          className="nav-item" 
+          style={{ width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '12px' }}
         >
-          <LogOut className="nav-icon" /> <span>Log Out</span>
+          <LogOut className="nav-icon" style={{ pointerEvents: 'none' }} /> <span>Log Out</span>
         </button>
       </div>
     </aside>
