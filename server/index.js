@@ -1,7 +1,11 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
 
 // --- OTP Store (in-memory, expires in 10 min) --- //
 const otpStore = {}; // { email: { otp, expiresAt } }
@@ -22,11 +26,11 @@ async function getTransporter() {
 
 const app = express();
 app.use(cors({
-  origin: '*',
+  origin: '*', // For production, replace with specific frontend URL
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-role'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-app.options('*', cors()); // Handle preflight for all routes
+app.options('*', cors()); 
 app.use(express.json());
 
 // Models
@@ -34,12 +38,26 @@ const User = require('./models/User');
 const Medicine = require('./models/Medicine');
 const Report = require('./models/Report');
 
+// --- Middleware: Verify JWT --- //
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (!token) return res.status(401).json({ success: false, message: 'Access denied. No token provided.' });
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ success: false, message: 'Invalid or expired token.' });
+    req.user = user;
+    next();
+  });
+}
+
 // Connect to MongoDB
-mongoose.connect('mongodb://127.0.0.1:27017/clinicsync', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/clinicsync', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(async () => {
-  console.log('✅ Connected to MongoDB -> clinicsync database');
+  console.log('✅ Connected to MongoDB');
 
   // Auto-populate mock data for hackathon
   const medCount = await Medicine.countDocuments();
@@ -62,8 +80,9 @@ mongoose.connect('mongodb://127.0.0.1:27017/clinicsync', {
 
   const userCount = await User.countDocuments();
   if (userCount === 0) {
-    await User.create({ fullName: 'Demo Staff', username: 'staff', password: 'password123', role: 'Pharmacist' });
-    console.log('✅ Auto-populated default staff user (staff / password123)');
+    // Note: The pre-save hook in User model will hash this password
+    await User.create({ fullName: 'Demo Staff', username: 'staff', email: 'staff@example.com', password: 'password123', role: 'Pharmacist' });
+    console.log('✅ Auto-populated default staff user (staff@example.com / password123)');
   }
 }).catch(err => console.error('MongoDB connection error:', err));
 
@@ -74,12 +93,27 @@ mongoose.connect('mongodb://127.0.0.1:27017/clinicsync', {
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = await User.findOne({ email, password });
-    if (user) {
-      res.json({ success: true, username: user.username, fullName: user.fullName, role: user.role });
-    } else {
-      res.status(401).json({ success: false, message: 'Invalid credentials' });
-    }
+    const user = await User.findOne({ email });
+    if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+    // Issue JWT
+    const token = jwt.sign(
+      { userId: user._id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({ 
+      success: true, 
+      token, 
+      username: user.username, 
+      fullName: user.fullName, 
+      role: user.role,
+      email: user.email
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -88,11 +122,19 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/auth/signup', async (req, res) => {
   const { username, email, password, fullName, role } = req.body;
   try {
-    const existing = await User.findOne({ username });
-    if (existing) return res.status(400).json({ success: false, message: 'Username exists' });
+    const existing = await User.findOne({ $or: [{ username }, { email }] });
+    if (existing) return res.status(400).json({ success: false, message: 'User already exists' });
 
-    await User.create({ username, email, password, fullName, role });
-    res.json({ success: true, username });
+    const user = await User.create({ username, email, password, fullName, role });
+    
+    // Issue JWT
+    const token = jwt.sign(
+      { userId: user._id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({ success: true, token, username: user.username });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -105,11 +147,9 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ success: false, message: 'No account found with that email' });
 
-    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    otpStore[email] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 }; // 10 min expiry
+    otpStore[email] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 }; 
 
-    // Send via Ethereal
     const transporter = await getTransporter();
     const info = await transporter.sendMail({
       from: '"ClinicSync" <noreply@clinicsync.app>',
@@ -130,16 +170,12 @@ app.post('/api/auth/send-otp', async (req, res) => {
 
     const previewUrl = nodemailer.getTestMessageUrl(info);
     console.log(`\n📧 OTP for ${email}: ${otp}`);
-    console.log(`🔗 Preview email at: ${previewUrl}\n`);
-
     res.json({ success: true, previewUrl, message: 'OTP sent to your email' });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ success: false, message: 'Failed to send OTP' });
   }
 });
 
-// Reset password (requires valid OTP)
 app.post('/api/auth/reset', async (req, res) => {
   const { email, otp, newPassword } = req.body;
   try {
@@ -147,16 +183,15 @@ app.post('/api/auth/reset', async (req, res) => {
     if (!user) return res.status(404).json({ success: false, message: 'No account found with that email' });
 
     const record = otpStore[email];
-    if (!record) return res.status(400).json({ success: false, message: 'No OTP requested. Please click Send OTP first.' });
+    if (!record) return res.status(400).json({ success: false, message: 'No OTP requested.' });
     if (Date.now() > record.expiresAt) {
       delete otpStore[email];
-      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new one.' });
+      return res.status(400).json({ success: false, message: 'OTP has expired.' });
     }
-    if (record.otp !== otp) return res.status(400).json({ success: false, message: 'Incorrect OTP. Please try again.' });
+    if (record.otp !== otp) return res.status(400).json({ success: false, message: 'Incorrect OTP.' });
 
-    // OTP verified — update password
     delete otpStore[email];
-    user.password = newPassword;
+    user.password = newPassword; // Model hook will hash this
     await user.save();
     res.json({ success: true, message: 'Password reset successfully' });
   } catch (err) {
@@ -164,8 +199,10 @@ app.post('/api/auth/reset', async (req, res) => {
   }
 });
 
+// --- PROTECTED ROUTES --- //
+
 // Inventory API
-app.get('/api/inventory', async (req, res) => {
+app.get('/api/inventory', authenticateToken, async (req, res) => {
   try {
     const data = await Medicine.find().sort({ createdAt: -1 });
     res.json({ success: true, data });
@@ -174,7 +211,7 @@ app.get('/api/inventory', async (req, res) => {
   }
 });
 
-app.post('/api/inventory', async (req, res) => {
+app.post('/api/inventory', authenticateToken, async (req, res) => {
   try {
     const med = await Medicine.create(req.body);
     res.json({ success: true, data: med });
@@ -183,10 +220,9 @@ app.post('/api/inventory', async (req, res) => {
   }
 });
 
-app.delete('/api/inventory/:id', async (req, res) => {
-  // ── ROLE GUARD: Only District Officer can delete ──────────────────────
-  const role = req.headers['x-user-role'];
-  if (role !== 'District Officer') {
+app.delete('/api/inventory/:id', authenticateToken, async (req, res) => {
+  // Use role from the verified token
+  if (req.user.role !== 'District Officer') {
     return res.status(403).json({ 
       success: false, 
       message: 'Access denied. Only District Officers can delete inventory items.' 
@@ -196,33 +232,30 @@ app.delete('/api/inventory/:id', async (req, res) => {
   try {
     const deleted = await Medicine.findByIdAndDelete(req.params.id);
     if (deleted) {
-      console.log(`🗑️ Deleted medicine: ${deleted.name} (${req.params.id})`);
       res.status(200).json({ success: true });
     } else {
-      console.warn(`🛑 Delete failed: Medicine with ID ${req.params.id} not found.`);
       res.status(404).json({ success: false, message: 'Medicine not found' });
     }
   } catch (err) {
-    console.error('❌ Error deleting medicine:', err);
-    res.status(500).json({ success: false, message: 'Internal Server Error during deletion' });
+    res.status(500).json({ success: false, message: 'Server error during deletion' });
   }
 });
 
-// ── REPORT ENDPOINTS ───────────────────────────────────────────────────────
-
-// Submit a new report
-app.post('/api/reports', async (req, res) => {
+// Report ENDPOINTS
+app.post('/api/reports', authenticateToken, async (req, res) => {
   try {
     const report = new Report(req.body);
     await report.save();
-    res.status(201).json({ success: true, message: 'Report submitted to District Officer' });
+    res.status(201).json({ success: true, message: 'Report submitted' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to submit report' });
   }
 });
 
-// Get unread reports for DO
-app.get('/api/reports/unread', async (req, res) => {
+app.get('/api/reports/unread', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'District Officer') {
+    return res.status(403).json({ success: false, message: 'Access denied.' });
+  }
   try {
     const reports = await Report.find({ status: 'pending' }).sort({ createdAt: -1 });
     res.json({ success: true, reports });
@@ -231,8 +264,10 @@ app.get('/api/reports/unread', async (req, res) => {
   }
 });
 
-// Mark report as read
-app.patch('/api/reports/:id/read', async (req, res) => {
+app.patch('/api/reports/:id/read', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'District Officer') {
+    return res.status(403).json({ success: false, message: 'Access denied.' });
+  }
   try {
     await Report.findByIdAndUpdate(req.params.id, { status: 'viewed' });
     res.json({ success: true });
@@ -241,61 +276,53 @@ app.patch('/api/reports/:id/read', async (req, res) => {
   }
 });
 
-// ── PROFILE ENDPOINTS ───────────────────────────────────────────────────────
+// Profile ENDPOINTS
+app.get('/api/auth/profile/:email', authenticateToken, async (req, res) => {
+  // Ensure user can only access their own profile (unless admin/DO)
+  if (req.user.email !== req.params.email && req.user.role !== 'District Officer') {
+    return res.status(403).json({ success: false, message: 'Access denied.' });
+  }
 
-// Get user profile by email
-app.get('/api/auth/profile/:email', async (req, res) => {
   try {
     const user = await User.findOne({ email: req.params.email });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     
     res.json({ 
       success: true, 
-      data: { 
-        fullName: user.fullName, 
-        email: user.email, 
-        role: user.role,
-        username: user.username
-      } 
+      data: { fullName: user.fullName, email: user.email, role: user.role, username: user.username } 
     });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
-// Update user profile
-app.patch('/api/auth/profile/:email', async (req, res) => {
+app.patch('/api/auth/profile/:email', authenticateToken, async (req, res) => {
+  if (req.user.email !== req.params.email && req.user.role !== 'District Officer') {
+    return res.status(403).json({ success: false, message: 'Access denied.' });
+  }
+
   const { fullName, email, role } = req.body;
   try {
     const user = await User.findOne({ email: req.params.email });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // If email is changing, check if new email is already taken
     if (email && email !== user.email) {
       const existing = await User.findOne({ email });
-      if (existing) return res.status(400).json({ success: false, message: 'Email already in use by another account' });
+      if (existing) return res.status(400).json({ success: false, message: 'Email already in use' });
       user.email = email;
     }
 
-    // Update fields
     if (fullName !== undefined) user.fullName = fullName;
-    if (role !== undefined) user.role = role;
+    if (role !== undefined && req.user.role === 'District Officer') user.role = role; // Only DO can change roles
 
     await user.save();
-    console.log(`👤 Updated profile for: ${user.email} (Name: ${user.fullName}, Role: ${user.role})`);
-    
-    res.json({ 
-      success: true, 
-      message: 'Profile updated successfully',
-      data: { fullName: user.fullName, email: user.email, role: user.role }
-    });
+    res.json({ success: true, message: 'Profile updated', data: { fullName: user.fullName, email: user.email, role: user.role } });
   } catch (err) {
-    console.error('❌ Profile Update Error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });

@@ -55,11 +55,12 @@ export default function Reports() {
     setMedicines(prev => prev.filter(m => m._id !== deleteId));
 
     try {
+      const token = localStorage.getItem('bugslayer_token');
       const res = await fetch(`http://127.0.0.1:5000/api/inventory/${deleteId}`, { 
         method: 'DELETE',
         headers: { 
           'Content-Type': 'application/json',
-          'x-user-role': localStorage.getItem('bugslayer_role') || ''
+          'Authorization': `Bearer ${token}`
         }
       });
       if (!res.ok) throw new Error("Delete operation failed on server");
@@ -89,9 +90,13 @@ export default function Reports() {
         lowStockMeds: [...criticalLow, ...lowStock].map(m => ({ name: m.name, batchNo: m.batchNo, quantity: m.quantity, minThreshold: m.minThreshold })),
       };
 
+      const token = localStorage.getItem('bugslayer_token');
       const res = await fetch('http://127.0.0.1:5000/api/reports', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(reportData)
       });
       

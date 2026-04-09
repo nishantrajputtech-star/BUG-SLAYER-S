@@ -31,8 +31,12 @@ export default function Profile({ onUpdate }) {
     const email = rawEmail.trim();
 
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/auth/profile/${encodeURIComponent(email)}`);
-      const data = await res.json();
+      const token = localStorage.getItem('bugslayer_token');
+      const res = await fetch(`http://127.0.0.1:5000/api/auth/profile/${encodeURIComponent(email)}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       if (data.success) {
         setFormData(data.data);
       } else {
@@ -55,9 +59,13 @@ export default function Profile({ onUpdate }) {
     const oldEmail = oldEmailRaw ? oldEmailRaw.trim() : '';
 
     try {
+      const token = localStorage.getItem('bugslayer_token');
       const res = await fetch(`http://127.0.0.1:5000/api/auth/profile/${encodeURIComponent(oldEmail)}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(formData)
       });
       const data = await res.json();

@@ -6,7 +6,12 @@ export function useMedicines() {
 
   const fetchMedicines = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/inventory');
+      const token = localStorage.getItem('bugslayer_token');
+      const res = await fetch('http://127.0.0.1:5000/api/inventory', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       const json = await res.json();
       if (json.success) {
         setMedicines(json.data);

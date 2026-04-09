@@ -40,9 +40,13 @@ export default function AddMedicine() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const token = localStorage.getItem('bugslayer_token');
       await fetch('http://127.0.0.1:5000/api/inventory', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           name: formData.name,
           batchNo: formData.batchNo,
@@ -51,7 +55,7 @@ export default function AddMedicine() {
           minThreshold: parseInt(formData.minThreshold, 10)
         })
       });
-      alert('Transferred to MongoDB securely!');
+      alert('Transferred to database securely!');
       navigate('/inventory');
     } catch (err) {
       alert('Error connecting to Backend API');

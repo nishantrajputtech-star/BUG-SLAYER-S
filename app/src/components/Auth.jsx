@@ -78,10 +78,11 @@ export default function Auth({ onLogin }) {
         });
         const data = await res.json();
         if (data.success) {
-          localStorage.setItem('bugslayer_auth', 'true');
+          localStorage.setItem('bugslayer_token', data.token);
           localStorage.setItem('bugslayer_user', data.fullName || data.username || email);
-          localStorage.setItem('bugslayer_role', data.role || 'Pharmacist');
-          localStorage.setItem('bugslayer_email', email);
+          localStorage.setItem('bugslayer_role', data.role);
+          localStorage.setItem('bugslayer_email', data.email);
+          localStorage.setItem('bugslayer_auth', 'true');
           onLogin(true);
         } else {
           setError(data.message || 'Invalid login credentials');
@@ -93,12 +94,16 @@ export default function Auth({ onLogin }) {
           body: JSON.stringify({ username: email, email, password, fullName, role }),
         });
         const data = await res.json();
-        if (!data.success) { setError(data.message || 'Sign up failed'); return; }
-        localStorage.setItem('bugslayer_auth', 'true');
-        localStorage.setItem('bugslayer_user', fullName || email);
-        localStorage.setItem('bugslayer_role', role || 'Pharmacist');
-        localStorage.setItem('bugslayer_email', email);
-        onLogin(true);
+        if (data.success) {
+          localStorage.setItem('bugslayer_token', data.token);
+          localStorage.setItem('bugslayer_user', fullName || email);
+          localStorage.setItem('bugslayer_role', role);
+          localStorage.setItem('bugslayer_email', email);
+          localStorage.setItem('bugslayer_auth', 'true');
+          onLogin(true);
+        } else {
+          setError(data.message || 'Sign up failed');
+        }
       }
     } catch {
       setError('Cannot reach server. Is the backend running?');

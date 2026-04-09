@@ -90,7 +90,12 @@ function Layout({ onLogout, userInfo }) {
 
     const checkReports = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:5000/api/reports/unread');
+        const token = localStorage.getItem('bugslayer_token');
+        const res = await fetch('http://127.0.0.1:5000/api/reports/unread', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         const data = await res.json();
         if (data.success && data.reports.length > 0) {
           setNotification(data.reports[0]); // Show the latest one
@@ -107,7 +112,13 @@ function Layout({ onLogout, userInfo }) {
 
   const closeNotification = async (markAsRead = false) => {
     if (markAsRead && notification) {
-      await fetch(`http://127.0.0.1:5000/api/reports/${notification._id}/read`, { method: 'PATCH' });
+      const token = localStorage.getItem('bugslayer_token');
+      await fetch(`http://127.0.0.1:5000/api/reports/${notification._id}/read`, { 
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
     }
     setNotification(null);
   };
@@ -203,6 +214,7 @@ function App() {
   const handleLogout = () => {
     // Clear brand keys
     localStorage.removeItem('bugslayer_auth');
+    localStorage.removeItem('bugslayer_token');
     localStorage.removeItem('bugslayer_user');
     localStorage.removeItem('bugslayer_role');
     localStorage.removeItem('bugslayer_email');

@@ -35,11 +35,12 @@ export default function ExecutiveAlerts() {
     setMedicines(prev => prev.filter(m => m._id !== deleteId));
 
     try {
+      const token = localStorage.getItem('bugslayer_token');
       const res = await fetch(`http://127.0.0.1:5000/api/inventory/${deleteId}`, { 
         method: 'DELETE',
         headers: { 
           'Content-Type': 'application/json',
-          'x-user-role': localStorage.getItem('bugslayer_role') || ''
+          'Authorization': `Bearer ${token}`
         }
       });
       if (!res.ok) throw new Error("Delete failed");
