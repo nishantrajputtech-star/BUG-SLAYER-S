@@ -26,10 +26,14 @@ function Sidebar({ onLogout, username, role }) {
       
       <Link to="/profile" className="sidebar-profile-link" style={{ textDecoration: 'none', color: 'inherit' }}>
         <div style={{ padding: '24px 16px 0', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{background: 'var(--border)', padding: '8px', borderRadius: '50%', position: 'relative'}}>
-             <User size={18} color="var(--text-muted)" />
-             <div style={{position: 'absolute', bottom: -2, right: -2, background: 'var(--primary)', borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white'}}>
-                <div style={{width: 6, height: 6, borderRadius: '50%', background: 'white'}} />
+          <div style={{ padding: '8px', borderRadius: '50%', position: 'relative', width: '40px', height: '40px', background: 'var(--border)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             {userInfo.profilePic ? (
+               <img src={userInfo.profilePic} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+             ) : (
+               <User size={18} color="var(--text-muted)" />
+             )}
+             <div style={{position: 'absolute', bottom: 0, right: 0, background: 'var(--primary)', borderRadius: '50%', width: 12, height: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white'}}>
+                <div style={{width: 5, height: 5, borderRadius: '50%', background: 'white'}} />
              </div>
           </div>
           <div style={{ flex: 1 }}>
@@ -192,14 +196,16 @@ function App() {
   const [isAuth, setIsAuth] = useState(false);
   const [userInfo, setUserInfo] = useState({
     username: 'Staff',
-    role: 'Pharmacist'
+    role: 'Pharmacist',
+    profilePic: ''
   });
 
   const syncUserInfo = () => {
     const u = localStorage.getItem('bugslayer_user');
     const r = localStorage.getItem('bugslayer_role');
-    if (u || r) {
-      setUserInfo({ username: u || 'Staff', role: r || 'Pharmacist' });
+    const p = localStorage.getItem('bugslayer_profilePic');
+    if (u || r || p) {
+      setUserInfo({ username: u || 'Staff', role: r || 'Pharmacist', profilePic: p || '' });
     }
   };
 
@@ -218,6 +224,7 @@ function App() {
     localStorage.removeItem('bugslayer_user');
     localStorage.removeItem('bugslayer_role');
     localStorage.removeItem('bugslayer_email');
+    localStorage.removeItem('bugslayer_profilePic');
     // Clear legacy keys to prevent conflicts
     localStorage.removeItem('clinicsync_auth');
     localStorage.removeItem('clinicsync_user');

@@ -82,6 +82,7 @@ export default function Auth({ onLogin }) {
           localStorage.setItem('bugslayer_user', data.fullName || data.username || email);
           localStorage.setItem('bugslayer_role', data.role);
           localStorage.setItem('bugslayer_email', data.email);
+          localStorage.setItem('bugslayer_profilePic', data.profilePic || '');
           localStorage.setItem('bugslayer_auth', 'true');
           onLogin(true);
         } else {

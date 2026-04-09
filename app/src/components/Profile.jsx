@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { User, Mail, Shield, Save, CheckCircle, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { User, Mail, Shield, Save, CheckCircle, AlertCircle, Loader2, ArrowLeft, Camera } from 'lucide-react';
+import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Profile({ onUpdate }) {
@@ -12,8 +12,10 @@ export default function Profile({ onUpdate }) {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
-    role: ''
+    role: '',
+    profilePic: ''
   });
+  const fileInputRef = useRef(null);
 
   const roles = ['Pharmacist', 'Nurse', 'Store Manager', 'District Officer'];
 
@@ -37,8 +39,14 @@ export default function Profile({ onUpdate }) {
           'Authorization': `Bearer ${token}`
         }
       });
+      const data = await res.json();
       if (data.success) {
-        setFormData(data.data);
+        setFormData({
+          fullName: data.data.fullName || '',
+          email: data.data.email || '',
+          role: data.data.role || '',
+          profilePic: data.data.profilePic || ''
+        });
       } else {
         setError(data.message);
       }
@@ -46,6 +54,21 @@ export default function Profile({ onUpdate }) {
       setError('Failed to fetch profile data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("Image too large (max 2MB)");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, profilePic: reader.result });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -75,6 +98,7 @@ export default function Profile({ onUpdate }) {
         localStorage.setItem('bugslayer_user', data.data.fullName);
         localStorage.setItem('bugslayer_role', data.data.role);
         localStorage.setItem('bugslayer_email', data.data.email);
+        localStorage.setItem('bugslayer_profilePic', data.data.profilePic || '');
         
         if (onUpdate) onUpdate(); // Refresh App global state
         setSuccess(true);
@@ -112,7 +136,25 @@ export default function Profile({ onUpdate }) {
         {/* Profile Banner */}
         <div style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', height: '120px', position: 'relative' }}>
           <div style={avatarWrapperStyle}>
-            {formData.fullName ? formData.fullName.charAt(0).toUpperCase() : <User />}
+            {formData.profilePic ? (
+              <img src={formData.profilePic} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              formData.fullName ? formData.fullName.charAt(0).toUpperCase() : <User />
+            )}
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current.click()}
+              style={cameraBtnStyle}
+            >
+              <Camera size={14} color="white" />
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              style={{ display: 'none' }} 
+              accept="image/*" 
+              onChange={handleFileChange}
+            />
           </div>
         </div>
 
@@ -209,7 +251,6 @@ const avatarWrapperStyle = {
   width: '100px',
   height: '100px',
   borderRadius: '50%',
-  background: 'white',
   border: '4px solid white',
   boxShadow: 'var(--shadow-md)',
   display: 'flex',
@@ -219,6 +260,22 @@ const avatarWrapperStyle = {
   fontWeight: '900',
   color: 'var(--primary)',
   background: '#f8fafc'
+};
+
+const cameraBtnStyle = {
+  position: 'absolute',
+  bottom: '4px',
+  right: '4px',
+  background: 'var(--primary)',
+  border: '2px solid white',
+  borderRadius: '50%',
+  width: '28px',
+  height: '28px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
 };
 
 const inputGroupStyle = { display: 'flex', flexDirection: 'column', gap: '8px' };

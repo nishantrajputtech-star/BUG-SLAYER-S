@@ -112,7 +112,8 @@ app.post('/api/auth/login', async (req, res) => {
       username: user.username, 
       fullName: user.fullName, 
       role: user.role,
-      email: user.email
+      email: user.email,
+      profilePic: user.profilePic
     });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -134,7 +135,7 @@ app.post('/api/auth/signup', async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    res.json({ success: true, token, username: user.username });
+    res.json({ success: true, token, username: user.username, profilePic: user.profilePic });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -289,7 +290,7 @@ app.get('/api/auth/profile/:email', authenticateToken, async (req, res) => {
     
     res.json({ 
       success: true, 
-      data: { fullName: user.fullName, email: user.email, role: user.role, username: user.username } 
+      data: { fullName: user.fullName, email: user.email, role: user.role, username: user.username, profilePic: user.profilePic } 
     });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -301,7 +302,7 @@ app.patch('/api/auth/profile/:email', authenticateToken, async (req, res) => {
     return res.status(403).json({ success: false, message: 'Access denied.' });
   }
 
-  const { fullName, email, role } = req.body;
+  const { fullName, email, role, profilePic } = req.body;
   try {
     const user = await User.findOne({ email: req.params.email });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
@@ -313,10 +314,11 @@ app.patch('/api/auth/profile/:email', authenticateToken, async (req, res) => {
     }
 
     if (fullName !== undefined) user.fullName = fullName;
+    if (profilePic !== undefined) user.profilePic = profilePic;
     if (role !== undefined && req.user.role === 'District Officer') user.role = role; // Only DO can change roles
 
     await user.save();
-    res.json({ success: true, message: 'Profile updated', data: { fullName: user.fullName, email: user.email, role: user.role } });
+    res.json({ success: true, message: 'Profile updated', data: { fullName: user.fullName, email: user.email, role: user.role, profilePic: user.profilePic } });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
