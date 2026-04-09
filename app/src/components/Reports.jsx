@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
-import { FileDown, AlertTriangle, PackageX, CheckCircle, Send, ShieldCheck, Trash2, Loader2 } from 'lucide-react';
+import { 
+  FileDown, AlertTriangle, PackageX, CheckCircle, Send, ShieldCheck, Trash2, Loader2,
+} from 'lucide-react';
 import { useMedicines } from '../hooks/useMedicines';
 import DeleteModal from './DeleteModal';
 
@@ -22,9 +24,11 @@ export default function Reports() {
     }
   }, [serverMedicines]);
 
-  const role = localStorage.getItem('clinicsync_role') || 'Pharmacist';
-  const fullName = localStorage.getItem('clinicsync_user') || 'Staff';
+  const storedRole = localStorage.getItem('bugslayer_role') || 'Pharmacist';
+  const role = storedRole.trim();
+  const fullName = localStorage.getItem('bugslayer_user') || 'Staff';
   const canApprove = role === 'Nurse' || role === 'Pharmacist';
+  const isDistrictOfficer = role === 'District Officer';
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -51,8 +55,12 @@ export default function Reports() {
     setMedicines(prev => prev.filter(m => m._id !== deleteId));
 
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/${deleteId}`, { 
-        method: 'DELETE'
+      const res = await fetch(`http://127.0.0.1:5000/api/inventory/${deleteId}`, { 
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-role': localStorage.getItem('bugslayer_role') || ''
+        }
       });
       if (!res.ok) throw new Error("Delete operation failed on server");
       
@@ -81,7 +89,7 @@ export default function Reports() {
         lowStockMeds: [...criticalLow, ...lowStock].map(m => ({ name: m.name, batchNo: m.batchNo, quantity: m.quantity, minThreshold: m.minThreshold })),
       };
 
-      const res = await fetch('http://localhost:5000/api/reports', {
+      const res = await fetch('http://127.0.0.1:5000/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reportData)
@@ -92,37 +100,48 @@ export default function Reports() {
         setTimeout(() => setSubmitted(false), 5000);
       }
     } catch (err) {
-      alert("Failed to submit report. Please try again.");
+      console.error("Submission error:", err);
     } finally {
       setSubmitting(false);
     }
   };
 
+  // ── PDF GENERATION ──────────────────────────────────────────────────────
   const handleGeneratePDF = () => {
-    if (loading) return;
     const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text('ClinicSync — District Health Report', 14, 18);
-    doc.setFontSize(11);
-    doc.text(`Facility: Village Sujan Pura, Bhind (M.P.)`, 14, 27);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 34);
-    let y = 48;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Header
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.text("BUG SLAYER'S - DISTRICT INVENTORY REPORT", 15, 25);
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${new Date().toLocaleString()} | Facility: Village Sujan Pura`, 15, 33);
 
-    const generateSection = (title, rows, color) => {
-      if (rows.length === 0) return;
-      doc.setFontSize(13); doc.setTextColor(...color);
-      doc.text(title, 14, y); y += 2;
-      doc.line(14, y, 196, y); y += 7;
-      doc.setTextColor(0, 0, 0); doc.setFontSize(10);
-      rows.forEach(med => {
-        if (y > 275) { doc.addPage(); y = 20; }
-        doc.text(med.name, 14, y);
-        doc.text(med.batchNo, 90, y);
-        doc.text(med.expiryDate || '—', 130, y);
-        doc.text(`Qty: ${med.quantity}`, 168, y);
-        y += 8;
+    let y = 50;
+
+    const generateSection = (title, items, color) => {
+      if (items.length === 0) return;
+      
+      doc.setFillColor(...color);
+      doc.rect(15, y, pageWidth - 30, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
+      doc.text(title, 20, y + 6);
+      
+      y += 15;
+      doc.setTextColor(50, 50, 50);
+      doc.setFontSize(9);
+      
+      items.forEach((item, index) => {
+        if (y > 270) { doc.addPage(); y = 20; }
+        doc.text(`${index + 1}. ${item.name} (Batch: ${item.batchNo})`, 20, y);
+        doc.text(`Qty: ${item.quantity} | Threshold: ${item.minThreshold} | Exp: ${item.expiryDate}`, 120, y);
+        y += 7;
       });
-      y += 8;
+      y += 5;
     };
 
     generateSection(`EXPIRED MEDICINES (${expiredMeds.length})`, expiredMeds, [180, 0, 0]);
@@ -130,7 +149,7 @@ export default function Reports() {
     generateSection(`CRITICAL LOW STOCK < 20 (${criticalLow.length})`, criticalLow, [220, 0, 0]);
     generateSection(`REORDER NEEDED (${lowStock.length})`, lowStock, [140, 100, 0]);
 
-    doc.save('clinicsync-district-report.pdf');
+    doc.save('bugslayers-district-report.pdf');
   };
 
   if (loading && medicines.length === 0) {
@@ -146,8 +165,17 @@ export default function Reports() {
     <div className="page-header">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '8px' }}>
         <div>
-          <h1>Reports</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Secure facility health insights for professional district audit.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h1>Reports</h1>
+            <span style={{ 
+              background: isDistrictOfficer ? '#e0f2fe' : '#f1f5f9', 
+              color: isDistrictOfficer ? '#0369a1' : '#64748b',
+              padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '800', border: '1px solid' + (isDistrictOfficer ? '#bae6fd' : '#e2e8f0')
+            }}>
+              {isDistrictOfficer ? '🛡️ DISTRICT OFFICER ACCESS' : '👤 STAFF ACCESS'}
+            </span>
+          </div>
+          <p style={{ color: 'var(--text-muted)' }}>Secure facility health insights for professional audit as <strong>{role}</strong>.</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           {canApprove && (
@@ -172,45 +200,11 @@ export default function Reports() {
         <SummaryCard icon={<CheckCircle size={22} color="#065f46" />}  label="Healthy Stock"   value={medicines.length - expiredMeds.length - outOfStock.length - criticalLow.length} bg="#d1fae5" text="#065f46" />
       </div>
 
-      <ReportSection 
-        title="🔴 Expired Medicines" 
-        color="#b91c1c" bg="#fee2e2" border="#ef4444" 
-        empty="✅ No expired medicines currently in stock."
-      >
-        {expiredMeds.length > 0 && (
-          <ReportTable meds={expiredMeds} type="expired" onDelete={handleDeleteTrigger} />
-        )}
-      </ReportSection>
+      {isDistrictOfficer && <DistrictMonitor expired={expiredMeds} outOfStock={outOfStock} />}
 
-      <ReportSection 
-        title="💥 Critical Low Alert (Quantity < 20)" 
-        color="#b91c1c" bg="#fee2e2" border="#ef4444" 
-        empty="✅ All items maintain safe operational levels."
-      >
-        {criticalLow.length > 0 && (
-          <ReportTable meds={criticalLow} type="critical" onDelete={handleDeleteTrigger} />
-        )}
-      </ReportSection>
-
-      <ReportSection 
-        title="📦 Out of Stock" 
-        color="#92400e" bg="#fef3c7" border="#f59e0b" 
-        empty="✅ Full inventory availability detected."
-      >
-        {outOfStock.length > 0 && (
-          <ReportTable meds={outOfStock} type="empty" onDelete={handleDeleteTrigger} />
-        )}
-      </ReportSection>
-
-      <ReportSection 
-        title="⚠️ Regular Reorder List (Below Threshold)" 
-        color="#0369a1" bg="#e0f2fe" border="#38bdf8" 
-        empty="✅ No supplementary reorders required."
-      >
-        {lowStock.length > 0 && (
-          <ReportTable meds={lowStock} type="low" onDelete={handleDeleteTrigger} />
-        )}
-      </ReportSection>
+      <ReportTable meds={expiredMeds} type="expired" onDelete={handleDeleteTrigger} isDistrictOfficer={isDistrictOfficer} />
+      <ReportTable meds={outOfStock} type="empty" onDelete={handleDeleteTrigger} isDistrictOfficer={isDistrictOfficer} />
+      <ReportTable meds={criticalLow} type="critical" onDelete={handleDeleteTrigger} isDistrictOfficer={isDistrictOfficer} />
 
       <DeleteModal 
         isOpen={!!deleteId}
@@ -223,84 +217,114 @@ export default function Reports() {
   );
 }
 
-// ── SHARED COMPONENTS ──────────────────────────────────────────────────────
-
-function ReportTable({ meds, type, onDelete }) {
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={tableStyle}>
-        <thead>
-          <tr>
-            <th style={thStyle}>Medicine Name</th>
-            <th style={thStyle}>Batch No</th>
-            {type === 'expired' ? <th style={thStyle}>Expired Date</th> : <th style={thStyle}>Qty</th>}
-            <th style={thStyle}>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {meds.map(med => {
-            return (
-              <tr key={med._id} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={tdStyle}><strong>{med.name}</strong></td>
-                <td style={tdStyle}>{med.batchNo}</td>
-                <td style={{ ...tdStyle, color: (type === 'expired' || type === 'critical') ? '#dc2626' : 'inherit', fontWeight: 'bold' }}>
-                  {type === 'expired' ? med.expiryDate : med.quantity}
-                </td>
-                <td style={tdStyle}>
-                  <button 
-                    onClick={(e) => onDelete(e, med)}
-                    style={{ 
-                      background: type === 'expired' ? '#ef4444' : '#f59e0b', 
-                      color: 'white', border: 'none',
-                      padding: '8px 16px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold',
-                      cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: '8px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <Trash2 size={14} />
-                    {type === 'expired' ? 'REMOVE NOW' : 'DISCARD'}
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 function SummaryCard({ icon, label, value, bg, text }) {
   return (
-    <div style={{ background: bg, borderRadius: 'var(--radius-lg)', padding: '20px 24px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-      <div style={{ background: 'white', borderRadius: '50%', width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)' }}>{icon}</div>
+    <div style={{ background: bg, padding: '20px', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', gap: '16px', border: `1px solid ${text}20` }}>
+      <div style={{ background: 'white', padding: '10px', borderRadius: '12px', display: 'flex', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>{icon}</div>
       <div>
-        <p style={{ fontSize: '2.2rem', fontWeight: '900', color: text, lineHeight: 1 }}>{value}</p>
-        <p style={{ fontSize: '0.85rem', color: text, opacity: 0.8, marginTop: 4, fontWeight: '600' }}>{label}</p>
+        <p style={{ fontSize: '1.5rem', fontWeight: '900', color: text }}>{value}</p>
+        <p style={{ fontSize: '0.8rem', color: text, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</p>
       </div>
     </div>
   );
 }
 
-function ReportSection({ title, color, bg, border, empty, children }) {
-  const hasContent = React.Children.toArray(children).some(c => c);
+function DistrictMonitor({ expired, outOfStock }) {
   return (
-    <div style={{ marginBottom: '32px', background: 'var(--surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', border: `1px solid ${border}`, overflow: 'hidden' }}>
-      <div style={{ padding: '16px 24px', background: bg, borderBottom: `1px solid ${border}` }}>
-        <h2 style={{ color, fontSize: '1.1rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {title}
-        </h2>
+    <div style={{ background: 'var(--primary-dark)', color: 'white', padding: '24px', borderRadius: 'var(--radius-lg)', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div>
+        <h3 style={{ fontSize: '1.1rem', marginBottom: '4px', color: 'white' }}>District Compliance Monitor</h3>
+        <p style={{ opacity: 0.8, fontSize: '0.85rem' }}>Active oversight for Village Sujan Pura Facility.</p>
       </div>
-      <div style={{ padding: hasContent ? '0' : '24px' }}>
-        {hasContent ? children : <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', textAlign: 'center' }}>{empty}</p>}
+      <div style={{ display: 'flex', gap: '24px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#fca5a5' }}>{expired.length}</p>
+          <p style={{ fontSize: '0.7rem', opacity: 0.8 }}>Exp. Risks</p>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#fcd34d' }}>{outOfStock.length}</p>
+          <p style={{ fontSize: '0.7rem', opacity: 0.8 }}>Stockouts</p>
+        </div>
       </div>
     </div>
   );
 }
 
-const btnStyle = { padding: '10px 20px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: '700', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' };
-const tableStyle = { width: '100%', borderCollapse: 'collapse', textAlign: 'left' };
-const thStyle = { padding: '16px 24px', color: 'var(--text-muted)', fontWeight: '700', borderBottom: '2px solid var(--border)', background: '#f8fafc', fontSize: '0.85rem' };
-const tdStyle = { padding: '16px 24px', color: 'var(--text-main)', fontSize: '0.95rem' };
+function ReportTable({ meds, type, onDelete, isDistrictOfficer }) {
+  const titles = {
+    expired: "🚨 Expired Medicines",
+    empty: "📦 Out of Stock Batches",
+    critical: "⚠️ Critical Low Stock (< 20 units)"
+  };
+
+  return (
+    <div style={{ marginBottom: '32px', background: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+      <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-main)' }}>{titles[type]}</h3>
+        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>{meds.length} Items</span>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)', background: '#fbfcfd' }}>
+              <th style={thStyle}>Date</th>
+              <th style={thStyle}>Medicine Name</th>
+              <th style={thStyle}>Batch No</th>
+              <th style={thStyle}>Status</th>
+              <th style={thStyle}>Quantity</th>
+              <th style={thStyle}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {meds.length > 0 ? meds.map(med => (
+              <tr key={med._id} style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={tdStyle}>{new Date(med.updatedAt || Date.now()).toLocaleDateString()}</td>
+                <td style={tdStyle}><strong>{med.name}</strong></td>
+                <td style={tdStyle}>{med.batchNo}</td>
+                <td style={tdStyle}>
+                  <span style={{ 
+                    padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold',
+                    background: type === 'expired' ? '#fee2e2' : '#fef3c7', 
+                    color: type === 'expired' ? '#b91c1c' : '#92400e' 
+                  }}>
+                    {type === 'expired' ? 'Expired' : type === 'empty' ? 'Out of Stock' : 'Low Stock'}
+                  </span>
+                </td>
+                <td style={tdStyle}>{med.quantity}</td>
+                <td style={tdStyle}>
+                  {isDistrictOfficer ? (
+                    <button 
+                      className="delete-btn-table"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}
+                      onClick={(e) => onDelete(e, med)}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      🔒 DO Only
+                    </span>
+                  )}
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan="6" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  No items found in this category.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+const thStyle = { padding: '16px 24px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' };
+const tdStyle = { padding: '16px 24px', fontSize: '0.9rem' };
+const btnStyle = { 
+  display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', 
+  borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--primary)', 
+  color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '0.85rem' 
+};

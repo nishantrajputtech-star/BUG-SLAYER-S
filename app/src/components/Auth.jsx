@@ -23,7 +23,7 @@ export default function Auth({ onLogin }) {
     e.preventDefault();
     setError(''); setInfo(''); setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/send-otp', {
+      const res = await fetch('http://127.0.0.1:5000/api/auth/send-otp', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
@@ -46,7 +46,7 @@ export default function Auth({ onLogin }) {
     e.preventDefault();
     setError(''); setInfo(''); setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/reset', {
+      const res = await fetch('http://127.0.0.1:5000/api/auth/reset', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp, newPassword: password }),
       });
@@ -72,29 +72,32 @@ export default function Auth({ onLogin }) {
     try {
       if (isLogin) {
         // Login with email + password
-        const res = await fetch('http://localhost:5000/api/auth/login', {
+        const res = await fetch('http://127.0.0.1:5000/api/auth/login', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
         });
         const data = await res.json();
         if (data.success) {
-          localStorage.setItem('clinicsync_auth', 'true');
-          localStorage.setItem('clinicsync_user', data.fullName || data.username || email);
-          localStorage.setItem('clinicsync_role', data.role || 'Pharmacist');
+          localStorage.setItem('bugslayer_auth', 'true');
+          localStorage.setItem('bugslayer_user', data.fullName || data.username || email);
+          localStorage.setItem('bugslayer_role', data.role || 'Pharmacist');
+          localStorage.setItem('bugslayer_email', email);
           onLogin(true);
         } else {
           setError(data.message || 'Invalid login credentials');
         }
       } else {
         // Signup — email is used as username
-        const res = await fetch('http://localhost:5000/api/auth/signup', {
+        const res = await fetch('http://127.0.0.1:5000/api/auth/signup', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: email, email, password, fullName, role }),
         });
         const data = await res.json();
         if (!data.success) { setError(data.message || 'Sign up failed'); return; }
-        localStorage.setItem('clinicsync_auth', 'true');
-        localStorage.setItem('clinicsync_user', fullName || email);
+        localStorage.setItem('bugslayer_auth', 'true');
+        localStorage.setItem('bugslayer_user', fullName || email);
+        localStorage.setItem('bugslayer_role', role || 'Pharmacist');
+        localStorage.setItem('bugslayer_email', email);
         onLogin(true);
       }
     } catch {

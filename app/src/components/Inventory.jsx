@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Trash2, Loader2 } from 'lucide-react';
 import { useMedicines } from '../hooks/useMedicines';
 import DeleteModal from './DeleteModal';
+import { useSearchParams } from 'react-router-dom';
 
 export default function Inventory() {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') || '');
   const { medicines: serverMedicines, refetch, loading } = useMedicines();
   const [medicines, setMedicines] = useState([]);
+  const [highlightedId, setHighlightedId] = useState(null);
+  const highlightedRowRef = useRef(null);
   
   // Modal state
   const [deleteId, setDeleteId] = useState(null);
@@ -17,6 +21,25 @@ export default function Inventory() {
   useEffect(() => {
     if (serverMedicines) setMedicines(serverMedicines);
   }, [serverMedicines]);
+
+  // When coming from Dashboard search, highlight the first match
+  useEffect(() => {
+    const paramSearch = searchParams.get('search');
+    if (paramSearch && medicines.length > 0) {
+      const match = medicines.find(m => m.name.toLowerCase() === paramSearch.toLowerCase());
+      if (match) {
+        setHighlightedId(match._id);
+        // Scroll to highlighted row after render
+        setTimeout(() => {
+          if (highlightedRowRef.current) {
+            highlightedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 150);
+        // Remove highlight after 2.5s
+        setTimeout(() => setHighlightedId(null), 2500);
+      }
+    }
+  }, [medicines, searchParams]);
 
   const filteredMedicines = medicines.filter(m => 
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -39,9 +62,12 @@ export default function Inventory() {
     setMedicines(prev => prev.filter(m => m._id !== deleteId));
 
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/${deleteId}`, { 
+      const res = await fetch(`http://127.0.0.1:5000/api/inventory/${deleteId}`, { 
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-role': localStorage.getItem('bugslayer_role') || ''
+        }
       });
       
       const result = await res.json();
@@ -76,7 +102,7 @@ export default function Inventory() {
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px'}}>
         <div>
           <h1>Inventory Management</h1>
-          <p>Database synchronization active (MongoDB Online).</p>
+          <p>All medicines are here</p>
         </div>
         <div style={{position: 'relative'}}>
           <Search style={{position: 'absolute', left: '12px', top: '10px'}} color="var(--text-muted)" size={18} />
@@ -107,10 +133,20 @@ export default function Inventory() {
             ) : filteredMedicines.map(med => {
                const isLowStock = med.quantity <= med.minThreshold;
                const isExpired = new Date(med.expiryDate) < new Date();
+               const isHighlighted = med._id === highlightedId;
                
                return (
-                <tr key={med._id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={tdStyle}><strong>{med.name}</strong></td>
+                <tr
+                  key={med._id}
+                  ref={isHighlighted ? highlightedRowRef : null}
+                  style={{
+                    borderBottom: '1px solid var(--border)',
+                    transition: 'background 0.4s ease',
+                    background: isHighlighted ? '#e0f2fe' : 'transparent',
+                    boxShadow: isHighlighted ? 'inset 0 0 0 2px #0ea5e9' : 'none',
+                  }}
+                >
+                  <td style={tdStyle}><strong>{med.name}</strong>{isHighlighted && <span style={{ marginLeft: '8px', fontSize: '0.7rem', background: '#0ea5e9', color: 'white', padding: '2px 8px', borderRadius: '20px', fontWeight: 'bold' }}>Found</span>}</td>
                   <td style={tdStyle}>{med.batchNo}</td>
                   <td style={{...tdStyle, color: isExpired ? 'var(--danger)' : 'inherit'}}>
                     {med.expiryDate} {isExpired && ' (Expired)'}

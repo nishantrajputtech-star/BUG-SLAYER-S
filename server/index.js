@@ -21,7 +21,12 @@ async function getTransporter() {
 }
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-role'],
+}));
+app.options('*', cors()); // Handle preflight for all routes
 app.use(express.json());
 
 // Models
@@ -179,6 +184,15 @@ app.post('/api/inventory', async (req, res) => {
 });
 
 app.delete('/api/inventory/:id', async (req, res) => {
+  // ── ROLE GUARD: Only District Officer can delete ──────────────────────
+  const role = req.headers['x-user-role'];
+  if (role !== 'District Officer') {
+    return res.status(403).json({ 
+      success: false, 
+      message: 'Access denied. Only District Officers can delete inventory items.' 
+    });
+  }
+
   try {
     const deleted = await Medicine.findByIdAndDelete(req.params.id);
     if (deleted) {
@@ -224,6 +238,60 @@ app.patch('/api/reports/:id/read', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false });
+  }
+});
+
+// ── PROFILE ENDPOINTS ───────────────────────────────────────────────────────
+
+// Get user profile by email
+app.get('/api/auth/profile/:email', async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.params.email });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        fullName: user.fullName, 
+        email: user.email, 
+        role: user.role,
+        username: user.username
+      } 
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Update user profile
+app.patch('/api/auth/profile/:email', async (req, res) => {
+  const { fullName, email, role } = req.body;
+  try {
+    const user = await User.findOne({ email: req.params.email });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // If email is changing, check if new email is already taken
+    if (email && email !== user.email) {
+      const existing = await User.findOne({ email });
+      if (existing) return res.status(400).json({ success: false, message: 'Email already in use by another account' });
+      user.email = email;
+    }
+
+    // Update fields
+    if (fullName !== undefined) user.fullName = fullName;
+    if (role !== undefined) user.role = role;
+
+    await user.save();
+    console.log(`👤 Updated profile for: ${user.email} (Name: ${user.fullName}, Role: ${user.role})`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Profile updated successfully',
+      data: { fullName: user.fullName, email: user.email, role: user.role }
+    });
+  } catch (err) {
+    console.error('❌ Profile Update Error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

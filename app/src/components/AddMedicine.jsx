@@ -40,7 +40,7 @@ export default function AddMedicine() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await fetch('http://localhost:5000/api/inventory', {
+      await fetch('http://127.0.0.1:5000/api/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

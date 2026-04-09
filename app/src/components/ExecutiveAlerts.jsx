@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, PackageX, Loader2, Trash2, Award } from 'lucide-react';
+import { AlertTriangle, PackageX, Loader2, Trash2 } from 'lucide-react';
 import { useMedicines } from '../hooks/useMedicines';
 import DeleteModal from './DeleteModal';
 
@@ -35,7 +35,13 @@ export default function ExecutiveAlerts() {
     setMedicines(prev => prev.filter(m => m._id !== deleteId));
 
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/${deleteId}`, { method: 'DELETE' });
+      const res = await fetch(`http://127.0.0.1:5000/api/inventory/${deleteId}`, { 
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-role': localStorage.getItem('bugslayer_role') || ''
+        }
+      });
       if (!res.ok) throw new Error("Delete failed");
       await refetch();
       setDeleteId(null);
@@ -57,18 +63,11 @@ export default function ExecutiveAlerts() {
   }
 
   return (
-    <div className="page-header">
-      <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding: '32px', borderRadius: 'var(--radius-lg)', color: 'white', marginBottom: '32px', boxShadow: 'var(--shadow-lg)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-          <div style={{ background: 'rgba(255,255,255,0.1)', padding: '10px', borderRadius: '12px' }}>
-            <Award color="#fbbf24" size={28} />
-          </div>
-          <h1 style={{ margin: 0, color: 'white', fontSize: '1.8rem' }}>Executive Priority Dashboard</h1>
-        </div>
-        <p style={{ opacity: 0.8, fontSize: '1rem', maxWidth: '600px' }}>
-          Welcome, District Officer. This view focuses exclusively on the highest priority inventory risks requiring your immediate attention.
-        </p>
-      </div>
+    <div className="page-header" style={{ paddingTop: '24px' }}>
+      <h1>Executive Priority Alerts</h1>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>
+        Immediate action required for high-risk inventory items.
+      </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
         <ExecutiveCard 

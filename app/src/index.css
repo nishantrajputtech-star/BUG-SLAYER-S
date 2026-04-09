@@ -124,6 +124,39 @@ h1, h2, h3, h4, h5, h6 {
   stroke-width: 2.5;
 }
 
+.logout-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  color: #dc2626;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logout-btn:hover {
+  background-color: #fee2e2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.logout-btn:active {
+  transform: scale(0.98);
+  background-color: #fecaca;
+}
+
+.logout-btn .nav-icon {
+  color: #dc2626;
+}
+
 /* Main Content */
 .main-content {
   flex: 1;
@@ -281,10 +314,11 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.8rem;
   font-weight: 700;
   margin-bottom: 32px;
+  margin-left: auto;
+  margin-right: auto;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  width: 100%;
-  justify-content: center;
+  white-space: nowrap;
 }
 
 .auth-header-text {
@@ -423,6 +457,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
   cursor: pointer;
   margin-top: 16px;
+  width: 100%;
   box-shadow: 0 10px 15px -3px rgba(13, 148, 136, 0.3);
   transition: all 0.2s;
   display: flex;

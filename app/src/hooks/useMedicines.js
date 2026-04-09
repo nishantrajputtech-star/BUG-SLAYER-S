@@ -6,7 +6,7 @@ export function useMedicines() {
 
   const fetchMedicines = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/inventory');
+      const res = await fetch('http://127.0.0.1:5000/api/inventory');
       const json = await res.json();
       if (json.success) {
         setMedicines(json.data);

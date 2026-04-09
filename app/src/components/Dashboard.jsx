@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AlertCircle, PackageX, PackageSearch, AlertTriangle, Sparkles, Zap, Search, Info } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useMedicines } from '../hooks/useMedicines';
 import { getAIPredictions } from '../services/AIPredictionService';
 
@@ -8,6 +8,15 @@ export default function Dashboard() {
   const { medicines, loading } = useMedicines();
   const [isScanning, setIsScanning] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const navigate = useNavigate();
+
+  const handleMedicineClick = (medName) => {
+    setShowSearch(false);
+    setSearchQuery('');
+    navigate(`/inventory?search=${encodeURIComponent(medName)}`);
+  };
   
   const aiInsights = useMemo(() => {
     return getAIPredictions(medicines).slice(0, 3);
@@ -39,16 +48,72 @@ export default function Dashboard() {
   
   const totalMedicinesCount = medicines.length;
 
+  const searchResults = searchQuery.trim().length > 0
+    ? medicines.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 6)
+    : [];
+
   return (
     <div className="page-header">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1>Dashboard Overview</h1>
           <p>Real-time status of Village Sujan Pura facility.</p>
         </div>
-        <Link to="/add" style={{ background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: 'var(--radius-md)', textDecoration: 'none', fontWeight: 'bold' }}>
-          + Add New Entry
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* ── SEARCH BAR ── */}
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', background: 'white', border: '2px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '8px 16px', gap: '8px', transition: 'border-color 0.2s', ...(showSearch ? { borderColor: 'var(--primary)' } : {}) }}>
+              <Search size={18} color="var(--text-muted)" />
+              <input
+                type="text"
+                placeholder="Search medicine..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                onFocus={() => setShowSearch(true)}
+                onBlur={() => setTimeout(() => setShowSearch(false), 200)}
+                style={{ border: 'none', outline: 'none', fontSize: '0.95rem', width: '220px', background: 'transparent', color: 'var(--text-main)', fontFamily: 'var(--font-sans)' }}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '2px' }}>✕</button>
+              )}
+            </div>
+            {/* Dropdown Results */}
+            {showSearch && searchResults.length > 0 && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, background: 'white', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)', zIndex: 100, overflow: 'hidden', minWidth: '280px' }}>
+                {searchResults.map(med => (
+                  <div
+                    key={med._id}
+                    style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f0f4ff'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                    onMouseDown={() => handleMedicineClick(med.name)}
+                  >
+                    <div>
+                      <p style={{ fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-main)' }}>{med.name}</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Batch: {med.batchNo} &nbsp;·&nbsp; Tap to view in Inventory →</p>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '700', padding: '4px 10px', borderRadius: '20px', background: med.quantity === 0 ? '#fee2e2' : med.quantity < 20 ? '#fef3c7' : '#d1fae5', color: med.quantity === 0 ? '#dc2626' : med.quantity < 20 ? '#92400e' : '#065f46' }}>
+                      Qty: {med.quantity}
+                    </span>
+                  </div>
+                ))}
+                <Link to="/inventory" style={{ display: 'block', textAlign: 'center', padding: '10px', fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 'bold', textDecoration: 'none', background: '#f8fafc' }}
+                  onClick={() => { setShowSearch(false); setSearchQuery(''); }}
+                >
+                  View All in Inventory →
+                </Link>
+              </div>
+            )}
+            {showSearch && searchQuery.trim().length > 0 && searchResults.length === 0 && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, background: 'white', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', padding: '14px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', boxShadow: 'var(--shadow-lg)', zIndex: 100 }}>
+                No medicines found for "{searchQuery}"
+              </div>
+            )}
+          </div>
+          <Link to="/add" style={{ background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: 'var(--radius-md)', textDecoration: 'none', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+            + Add New Entry
+          </Link>
+        </div>
       </div>
 
       {/* ── INTERACTIVE AI SCAN ─────────────────────────────────────────── */}

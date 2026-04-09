@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Outlet, Link, useLocation, Navigate } from 'react-router-dom';
-import { Pill, LayoutDashboard, PlusCircle, AlertTriangle, FileText, LogOut, User, Bell, X, Check, Award } from 'lucide-react';
+import { Package2, Stethoscope, LayoutDashboard, PlusCircle, AlertTriangle, FileText, LogOut, User, Bell, X, Check, Award, Settings } from 'lucide-react';
 
 import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
@@ -9,31 +9,40 @@ import ExpiryAlerts from './components/ExpiryAlerts';
 import Reports from './components/Reports';
 import ExecutiveAlerts from './components/ExecutiveAlerts';
 import Auth from './components/Auth';
+import Profile from './components/Profile';
 
-function Sidebar({ onLogout }) {
+function Sidebar({ onLogout, username, role }) {
   const location = useLocation();
   const isActive = (path) => location.pathname === path;
-  const username = localStorage.getItem('clinicsync_user') || 'Staff';
-  const role = localStorage.getItem('clinicsync_role') || 'Guest';
 
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
         <div style={{background: 'var(--primary-light)', padding: '8px', borderRadius: '8px'}}>
-          <Pill className="logo-icon" color="var(--primary)" />
+          <Stethoscope className="logo-icon" color="var(--primary)" />
         </div>
-        <h2>ClinicSync</h2>
+        <h2>Bug Slayer's</h2>
       </div>
       
-      <div style={{ padding: '24px 16px 0', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div style={{background: 'var(--border)', padding: '8px', borderRadius: '50%'}}>
-           <User size={18} color="var(--text-muted)" />
+      <Link to="/profile" className="sidebar-profile-link" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <div style={{ padding: '24px 16px 0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{background: 'var(--border)', padding: '8px', borderRadius: '50%', position: 'relative'}}>
+             <User size={18} color="var(--text-muted)" />
+             <div style={{position: 'absolute', bottom: -2, right: -2, background: 'var(--primary)', borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white'}}>
+                <div style={{width: 6, height: 6, borderRadius: '50%', background: 'white'}} />
+             </div>
+          </div>
+          <div style={{ flex: 1 }}>
+             <p style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 2}}>{role}</p>
+             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+               <strong style={{fontSize: '0.9rem'}}>{username}</strong>
+               <div className="edit-icon-bg" style={{ padding: '4px', borderRadius: '4px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                 <Settings size={12} style={{ color: 'var(--primary)' }} />
+               </div>
+             </div>
+          </div>
         </div>
-        <div>
-           <p style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>{role}</p>
-           <strong style={{fontSize: '0.9rem'}}>{username}</strong>
-        </div>
-      </div>
+      </Link>
 
       <nav className="sidebar-nav" style={{flex: 1}}>
         {role === 'District Officer' && (
@@ -45,7 +54,7 @@ function Sidebar({ onLogout }) {
           <LayoutDashboard className="nav-icon" /> Dashboard
         </Link>
         <Link to="/inventory" className={`nav-item ${isActive('/inventory') ? 'active' : ''}`}>
-          <Pill className="nav-icon" /> Inventory
+          <Package2 className="nav-icon" /> Inventory
         </Link>
         <Link to="/add" className={`nav-item ${isActive('/add') ? 'active' : ''}`}>
           <PlusCircle className="nav-icon" /> Add Medicine
@@ -58,18 +67,21 @@ function Sidebar({ onLogout }) {
         </Link>
       </nav>
 
-      <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-        <button onClick={onLogout} className="nav-item" style={{ width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: 'var(--danger)' }}>
-          <LogOut className="nav-icon" /> Log Out
+      <div style={{ padding: '20px', borderTop: '1px solid var(--border)' }}>
+        <button 
+          onClick={(e) => { e.preventDefault(); onLogout(); }} 
+          className="logout-btn"
+        >
+          <LogOut className="nav-icon" /> <span>Log Out</span>
         </button>
       </div>
     </aside>
   );
 }
 
-function Layout({ onLogout }) {
+function Layout({ onLogout, userInfo }) {
   const [notification, setNotification] = useState(null);
-  const role = localStorage.getItem('clinicsync_role');
+  const { role } = userInfo;
 
   // Check for new reports for District Officer
   useEffect(() => {
@@ -77,7 +89,7 @@ function Layout({ onLogout }) {
 
     const checkReports = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/reports/unread');
+        const res = await fetch('http://127.0.0.1:5000/api/reports/unread');
         const data = await res.json();
         if (data.success && data.reports.length > 0) {
           setNotification(data.reports[0]); // Show the latest one
@@ -94,22 +106,25 @@ function Layout({ onLogout }) {
 
   const closeNotification = async (markAsRead = false) => {
     if (markAsRead && notification) {
-      await fetch(`http://localhost:5000/api/reports/${notification._id}/read`, { method: 'PATCH' });
+      await fetch(`http://127.0.0.1:5000/api/reports/${notification._id}/read`, { method: 'PATCH' });
     }
     setNotification(null);
   };
 
   return (
     <div className="app-layout">
-      <Sidebar onLogout={onLogout} />
+      <Sidebar onLogout={onLogout} username={userInfo.username} role={userInfo.role} />
       <main className="main-content">
         <header className="mobile-header" style={{ justifyContent: 'space-between' }}>
           <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-            <Pill className="logo-icon" />
-            <h2>ClinicSync</h2>
+            <Stethoscope className="logo-icon" />
+            <h2>Bug Slayer's</h2>
           </div>
-          <button onClick={onLogout} style={{background:'transparent', border:'none', color:'var(--danger)'}}>
-            <LogOut size={20} />
+          <button 
+            onClick={(e) => { e.preventDefault(); onLogout(); }} 
+            style={{background:'transparent', border:'none', color:'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center'}}
+          >
+            <LogOut size={20} style={{ pointerEvents: 'none' }} />
           </button>
         </header>
 
@@ -163,36 +178,59 @@ const notifAckBtn = { background: '#f1f5f9', color: 'var(--text-main)', padding:
 
 function App() {
   const [isAuth, setIsAuth] = useState(false);
+  const [userInfo, setUserInfo] = useState({
+    username: 'Staff',
+    role: 'Pharmacist'
+  });
+
+  const syncUserInfo = () => {
+    const u = localStorage.getItem('bugslayer_user');
+    const r = localStorage.getItem('bugslayer_role');
+    if (u || r) {
+      setUserInfo({ username: u || 'Staff', role: r || 'Pharmacist' });
+    }
+  };
 
   useEffect(() => {
-    const authStatus = localStorage.getItem('clinicsync_auth');
+    const authStatus = localStorage.getItem('bugslayer_auth');
     if (authStatus === 'true') {
       setIsAuth(true);
+      syncUserInfo();
     }
   }, []);
 
   const handleLogout = () => {
-    localStorage.clear(); // Clear all (auth, user, role)
+    // Clear brand keys
+    localStorage.removeItem('bugslayer_auth');
+    localStorage.removeItem('bugslayer_user');
+    localStorage.removeItem('bugslayer_role');
+    localStorage.removeItem('bugslayer_email');
+    // Clear legacy keys to prevent conflicts
+    localStorage.removeItem('clinicsync_auth');
+    localStorage.removeItem('clinicsync_user');
+    localStorage.removeItem('clinicsync_role');
+    
     setIsAuth(false);
+    // Force a small delay then redirect to root to ensure clean state
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 10);
   };
 
   if (!isAuth) {
-    return <Auth onLogin={setIsAuth} />;
+    return <Auth onLogin={(status) => { setIsAuth(status); syncUserInfo(); }} />;
   }
 
   return (
     <Routes>
-      <Route path="/" element={<Layout onLogout={handleLogout} />}>
-        <Route index element={
-          localStorage.getItem('clinicsync_role') === 'District Officer'
-            ? <Navigate to="/reports" replace />
-            : <Dashboard />
-        } />
+      <Route path="/" element={<Layout onLogout={handleLogout} userInfo={userInfo} />}>
+        <Route index element={<Dashboard />} />
         <Route path="inventory" element={<Inventory />} />
         <Route path="add" element={<AddMedicine />} />
         <Route path="alerts" element={<ExpiryAlerts />} />
         <Route path="reports" element={<Reports />} />
         <Route path="executive-alerts" element={<ExecutiveAlerts />} />
+        <Route path="profile" element={<Profile onUpdate={syncUserInfo} />} />
       </Route>
     </Routes>
   );
