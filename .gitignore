@@ -1,4 +1,13 @@
+# Dependencies
 node_modules/
-dist/
+
+# Environment variables
 .env
+.env.*
+
+# Frontend Build outputs (Vite/React)
+app/dist/
+
+# IDE and OS files
+.vscode/
 .DS_Store
